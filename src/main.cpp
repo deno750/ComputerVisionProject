@@ -50,12 +50,12 @@ vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
     Mat image = input.clone();
     //GaussianBlur(input, image, Size(7, 7), 2);
     
-    float posMul = 1;
+    float posMul = 500;
     vector<Vec6f> to_cluster;
     for (int i = 0; i < image.rows; i++) {
         for (int j = 0; j < image.cols; j++) {
-            float x = static_cast<float>(j) / posMul;
-            float y = static_cast<float>(i) / posMul;
+            float x = static_cast<float>(j) / input.cols * posMul;
+            float y = static_cast<float>(i) / input.rows * posMul;
             
             Vec3b color = image.at<Vec3b>(i, j);
             Vec6f point = Vec6f(x, y, color[0], color[1], color[2], -1);
@@ -72,8 +72,8 @@ vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
     vector<Vec3b> colors;
     
     for (int i = 0; i < K; i++) {
-        int x = static_cast<float>(centers[i][0]) * posMul;
-        int y = static_cast<float>(centers[i][1]) * posMul;
+        int x = static_cast<float>(centers[i][0]) * input.cols / posMul;
+        int y = static_cast<float>(centers[i][1]) * input.rows / posMul;
         
         float b = centers[i][2];
         float g = centers[i][3];
@@ -107,7 +107,6 @@ void drawRect(Mat image, Mat cluster, Scalar color = Scalar(0, 255, 0), uint rec
     float maxX = FLT_MIN;
     float minY = FLT_MAX;
     float maxY = FLT_MIN;
-    Point2f pointMinX, pointMaxX, pointMinY, pointMaxY;
     for (int i = 0; i < cluster.rows; i++) {
         for (int j = 0; j < cluster.cols; j++) {
             Vec3b color = cluster.at<Vec3b>(i, j);
@@ -155,7 +154,7 @@ int main() {
         
     }
     
-    Mat testImage = imread("../benchmark/Figure 26.jpg");
+    Mat testImage = imread("../benchmark/Figure 5.jpg");
     
     TreeFeatureExtractor treeFeature = TreeFeatureExtractor(200, "vocabulary_test", "model_test");
     treeFeature.createVocabulary(vocabularyImages);
@@ -164,7 +163,7 @@ int main() {
     Mat clusterImage;
     Mat1f clusterCenters;
     Mat toCluster;
-    uint numberColors = 8;
+    uint numberColors = 6;
     vector<Mat> clusters = cluster(testImage, clusterImage, numberColors, clusterCenters);
     imshow("Clustered image", clusterImage);
     
@@ -172,6 +171,7 @@ int main() {
         Mat cluster = clusters[i];
         int res = treeFeature.predict(cluster);
         if (res == 1) {
+            medianBlur(cluster, cluster, 7);
             drawRect(testImage, cluster);
             
             imshow("Cluster with tree " + to_string(i), cluster);
