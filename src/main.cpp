@@ -13,7 +13,7 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/ximgproc/lsc.hpp>
 
-#include "feature_extraction.h"
+#include "object_recognition.h"
 
 using namespace std;
 using namespace cv;
