@@ -18,24 +18,26 @@
 using namespace std;
 using namespace cv;
 
+/**
+ * Splits the image in more images one for each cluster. We have K cluster centers and we'll return K mat istances.
+ *
+ * -Param Image is the original image
+ * -Param Clustered is the clustered image (i.e. an image with k colors for each cluster)
+ * -Param Centers contains cluster centers
+ * -Param clusters is output vector which will contain splitted clusters
+ */
 void splitCluster(Mat image, Mat clustered, Mat1f centers, vector<Mat> &clusters) {
     for (int k = 0; k < centers.rows; k++) {
         Vec3b clusterColor;
-        if (centers.cols == 6) {
-            Vec6f ctr = centers.at<Vec6f>(k);
-            clusterColor = Vec3b(ctr[2], ctr[3], ctr[4]);
-        } else {
-            clusterColor = Vec3b(centers.at<Vec3f>(k));
-        }
+        Vec6f ctr = centers.at<Vec6f>(k);
+        clusterColor = Vec3b(ctr[2], ctr[3], ctr[4]);
         
-        cout << "cluster color: " << clusterColor << endl;
         Mat mat = Mat(image.rows, image.cols, image.type(), Scalar(255, 255, 255));
         for (int i = 0; i < image.rows; i++) {
             for (int j = 0; j < image.cols; j++) {
                 Vec3b color = clustered.at<Vec3b>(i, j);
-                //cout << "Color: " << color << endl;
                 if (color == clusterColor) {
-                    mat.at<Vec3b>(i, j) = image.at<Vec3b>(i, j);
+                    mat.at<Vec3b>(i, j) = image.at<Vec3b>(i, j); //On each mat, we don't return the cluster color but the image's original color in corresponding clustered color.
                 }
             }
         }
@@ -44,36 +46,46 @@ void splitCluster(Mat image, Mat clustered, Mat1f centers, vector<Mat> &clusters
     
 }
 
+/**
+ * Clusterize the image by position and color. The cluster
+ *
+ * -Param input is the image to clusterize
+ * -Param output is the clustered image
+ * -Param K is the number of centers
+ * -Param centers is the output mat which contains the found centers of clusters
+ *
+ * -Returns the vector of mat which contains for each a cluster of the original image
+ */
 vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
     TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
     vector<int> labels;
     Mat image = input.clone();
     //GaussianBlur(input, image, Size(7, 7), 2);
     
-    float posMul = 500;
+    float posMul = 500; //This ensures that the maximal value of positions if 500
     vector<Vec6f> to_cluster;
     for (int i = 0; i < image.rows; i++) {
         for (int j = 0; j < image.cols; j++) {
+            //Normalized value of x and y multiplied by posMul in order to make the position relevance independet by the size of the image
             float x = static_cast<float>(j) / input.cols * posMul;
             float y = static_cast<float>(i) / input.rows * posMul;
             
+            
             Vec3b color = image.at<Vec3b>(i, j);
-            Vec6f point = Vec6f(x, y, color[0], color[1], color[2], -1);
+            Vec6f point = Vec6f(x, y, color[0], color[1], color[2], 0); //We need a 5f vector. We use Vec6f but the last paramether is set to 0
             
             to_cluster.push_back(point);
         }
     }
     
     kmeans(to_cluster, K, labels, criteria, 1, KMEANS_PP_CENTERS, centers);
-    cout << centers << endl;
     
     output = image.clone();
     
     vector<Vec3b> colors;
     
+    //Create color for each cluster
     for (int i = 0; i < K; i++) {
-        int x = static_cast<float>(centers[i][0]) * input.cols / posMul;
-        int y = static_cast<float>(centers[i][1]) * input.rows / posMul;
         
         float b = centers[i][2];
         float g = centers[i][3];
@@ -81,11 +93,10 @@ vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
         
         Vec3b color = Vec3b(b, g, r);
         colors.push_back(color);
-        
-        cout << "x: " << x << " y: " << y << " color: " << color << endl;
     }
     
     
+    //Coloring the image with cluster colors in order to visualize the clustering
     size_t arrayIndex = 0;
     for (int i = 0; i < image.rows; i++) {
         for (int j = 0; j < image.cols; j++) {
@@ -97,11 +108,20 @@ vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
     }
     
     
+    //We return clustered images
     vector<Mat> clusters;
     splitCluster(input, output, centers, clusters);
     return clusters;
 }
 
+/**
+ * Draws a rect that contains all pixels of the passed cluster in the original image
+ *
+ * -Param image is the original image
+ * -Param cluster is the mat which contains one of K found clusters
+ * -Param color is the color of the rect
+ * -Param rect_width is the width of the desired rect
+ */
 void drawRect(Mat image, Mat cluster, Scalar color = Scalar(0, 255, 0), uint rect_width = 5) {
     float minX = FLT_MAX;
     float maxX = FLT_MIN;
@@ -130,7 +150,7 @@ void drawRect(Mat image, Mat cluster, Scalar color = Scalar(0, 255, 0), uint rec
     rectangle(image, Point2f(minX, minY), Point2f(maxX, maxY), color, rect_width);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     Mat mat;
     vector<String> images_paths;
     utils::fs::glob("../dataset", "*.*", images_paths);
@@ -156,7 +176,7 @@ int main() {
     
     Mat testImage = imread("../benchmark/Figure 5.jpg");
     
-    TreeFeatureExtractor treeFeature = TreeFeatureExtractor(200, "vocabulary_test", "model_test");
+    ObjectRecognition treeFeature = ObjectRecognition(200, "vocabulary_test", "model_test");
     treeFeature.createVocabulary(vocabularyImages);
     treeFeature.train(images);
     
