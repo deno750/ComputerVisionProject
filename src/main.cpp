@@ -150,8 +150,14 @@ void drawRect(Mat image, Mat cluster, Scalar color = Scalar(0, 255, 0), uint rec
     rectangle(image, Point2f(minX, minY), Point2f(maxX, maxY), color, rect_width);
 }
 
+#define SHOULD_TRAIN false //Since the user that uses this program shouldn't be aware of what is going under the hood, the training process can be activated only in code. So when the user uses the program, a vocabulary and svm model must be already trained. To create models for user's program, the developer will activate the train phase directly in code.
+
+//The input program should have as parameters image_path and number_of_clusters. If image_path is not passed, a default image will be used. When number_of_clusters is not passed, a default number of clusters is used (i.e. 5)
 int main(int argc, char *argv[]) {
-    Mat mat;
+    
+    ObjectRecognition treeFeature = ObjectRecognition(200, "vocabulary", "model");
+    
+#if SHOULD_TRAIN
     vector<String> images_paths;
     utils::fs::glob("../dataset", "*.*", images_paths);
     vector<Mat> images;
@@ -166,6 +172,10 @@ int main(int argc, char *argv[]) {
     
     
     int vocabularyImagesSize = 30;
+    if (vocabularyImagesSize > images.size()) {
+        cerr << "The number of images should be at least 30" << endl;
+        return -1;
+    }
     
     vector<Mat> vocabularyImages;
     for (int i = 0; i < vocabularyImagesSize; i++) {
@@ -173,35 +183,63 @@ int main(int argc, char *argv[]) {
         vocabularyImages.push_back(images[randomIndex]);
         
     }
-    
-    Mat testImage = imread("../benchmark/Figure 5.jpg");
-    
-    ObjectRecognition treeFeature = ObjectRecognition(200, "vocabulary_test", "model_test");
     treeFeature.createVocabulary(vocabularyImages);
     treeFeature.train(images);
+    cout << "Tree training ended" << endl;
+#endif
+    
+    string imagePath;
+    if (argc == 1) {
+        imagePath = "../benchmark/Figure 5.jpg";
+        
+    } else {
+        imagePath = string(argv[1]);
+    }
+    
+    //Parsing the path of the image to predict
+    Mat image = imread(imagePath);
+    if (image.empty()) {
+        cerr << "An image isn't passed" << endl;
+        return -1;
+    }
+    
+    //Parsing the number of clusters from input
+    uint numberOfClusters = 5;
+    if (argc == 3) {
+        int inputCluster = atoi(argv[2]);
+        if (inputCluster <= 0) {
+            cerr << "Number of clusters must be > 0" << endl;
+            return -1;
+        }
+        numberOfClusters = inputCluster;
+    }
+    
+    
     
     Mat clusterImage;
     Mat1f clusterCenters;
-    Mat toCluster;
-    uint numberColors = 6;
-    vector<Mat> clusters = cluster(testImage, clusterImage, numberColors, clusterCenters);
+    vector<Mat> clusters = cluster(image, clusterImage, numberOfClusters, clusterCenters);
     imshow("Clustered image", clusterImage);
     
     for (int i = 0; i < clusters.size(); i++) {
         Mat cluster = clusters[i];
         int res = treeFeature.predict(cluster);
+        if (res == -1) { //If we are trying to predict with an untrained model, we should end the program
+            return -1;
+        }
         if (res == 1) {
-            medianBlur(cluster, cluster, 7);
-            drawRect(testImage, cluster);
+            medianBlur(cluster, cluster, 11); //Median blur is used to remove pixel noise
+            drawRect(image, cluster);
             
-            imshow("Cluster with tree " + to_string(i), cluster);
+            //imshow("Cluster with tree " + to_string(i), cluster);
         }
     }
     
     
-    imshow("test", testImage);
+    imshow("Tree detection", image);
     
     waitKey(0);
+    
     return 0;
 }
 

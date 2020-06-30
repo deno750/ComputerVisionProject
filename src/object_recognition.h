@@ -155,9 +155,13 @@ public:
      * -Param image the image where we want detect the desired object
      * -Param keypoints is used when keypoints of an image are already available, so we can pass them here to avoid a recomputation. If this parameter is not passed, the keypoints will be computed inside this function
      *
-     * -Returns 1 if the image contains the expected object, 0 otherwise
+     * -Returns 1 if the image contains the expected object, 0 otherwise. -1 if the prediction is impossible
      */
     int predict(cv::Mat image, vector<cv::KeyPoint> keypoints = vector<cv::KeyPoint>()) {
+        if (vocabulary.empty() || !svm->isTrained()) {
+            cerr << "You can't predict an image without a trained vocabulary and a prediction model" << endl;
+            return -1;
+        }
         cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SiftFeatureDetector::create();
         cv::Ptr<cv::DescriptorMatcher> matcher = cv::FlannBasedMatcher::create();
         cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::SiftDescriptorExtractor::create();
