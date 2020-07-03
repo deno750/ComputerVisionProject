@@ -60,9 +60,8 @@ vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
     TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
     vector<int> labels;
     Mat image = input.clone();
-    //GaussianBlur(input, image, Size(7, 7), 2);
     
-    float posMul = 500; //This ensures that the maximal value of positions if 500
+    float posMul = 500; //This ensures that the maximal value of positions is 500
     vector<Vec6f> to_cluster;
     for (int i = 0; i < image.rows; i++) {
         for (int j = 0; j < image.cols; j++) {
@@ -159,7 +158,7 @@ int main(int argc, char *argv[]) {
     
 #if SHOULD_TRAIN
     vector<String> images_paths;
-    utils::fs::glob("../dataset", "*.*", images_paths);
+    utils::fs::glob("../dataset", "tree*.*", images_paths);
     vector<Mat> images;
     for (String imPath : images_paths) {
         Mat mat = imread(imPath);

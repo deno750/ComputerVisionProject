@@ -23,6 +23,11 @@ private:
     string svmModelpath;
     cv::Mat vocabulary;
     cv::Ptr<cv::ml::SVM> svm;
+    cv::Ptr<cv::FeatureDetector> detector;
+    
+    //Bag of words extractor which is initialized with SiftDescriptorExtractor and FlanBasedMatcher
+    cv::BOWImgDescriptorExtractor bowExtraction = cv::BOWImgDescriptorExtractor(cv::xfeatures2d::SiftDescriptorExtractor::create(),
+                                                                                cv::FlannBasedMatcher::create());
     
 public:
     /**
@@ -34,6 +39,8 @@ public:
         this->vocabularySize = vocabularySize;
         this->vocabularypath = !vocabularyFileName.empty() ? "../models/vocabulary/" +vocabularyFileName+ ".yml" : "";
         this->svmModelpath = !svmModelFileName.empty() ? "../models/svm/" +svmModelFileName+ ".xml" : "";
+        detector = cv::xfeatures2d::SiftFeatureDetector::create();
+        
         cv::FileStorage svmReadStorage = cv::FileStorage(svmModelpath, cv::FileStorage::READ);
         if (!svmModelpath.empty() && svmReadStorage.isOpened()) { //We check if a SVM model is already trained with the name passed in svmModelFileName
             svm = cv::Algorithm::load<cv::ml::SVM>(svmModelpath);
@@ -48,8 +55,10 @@ public:
         cv::FileStorage vocabularyReadStorage = cv::FileStorage(vocabularypath, cv::FileStorage::READ);
         if (!vocabularypath.empty() && vocabularyReadStorage.isOpened()) { //Checks wheter a vocabulary is already stored
             vocabularyReadStorage["vocabulary"] >> vocabulary;
+            bowExtraction.setVocabulary(vocabulary);
         }
         vocabularyReadStorage.release();
+        
     }
     
     cv::Mat getvocabulary() {
@@ -87,6 +96,7 @@ public:
         cv::BOWKMeansTrainer trainer = cv::BOWKMeansTrainer(vocabularySize);
         trainer.add(untrainedDescriptions);
         vocabulary = trainer.cluster();
+        bowExtraction.setVocabulary(vocabulary);
         cout << "Vocabulary train finished" << endl;
         
         //Stores the vocabulary on a file
@@ -107,32 +117,29 @@ public:
             cout << "Svm model is loaded from file" << endl;
             return;
         }
-        cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SiftFeatureDetector::create();
-        cv::Ptr<cv::DescriptorMatcher> matcher = cv::FlannBasedMatcher::create();//Flann is used rather than BFMather for the velocity of computation
-        cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::SiftDescriptorExtractor::create();
-        cv::BOWImgDescriptorExtractor bowExtraction = cv::BOWImgDescriptorExtractor(extractor, matcher);
+        
         if (vocabulary.rows == 0) {
             cerr << "The vocabulary must be created first!" << endl;
             return;
         }
-        bowExtraction.setVocabulary(vocabulary);
+       
         cout << "Svm started to train" << endl;
         
         cv::Mat descriptors_to_train;
-        cv::Mat labels;
+        vector<int> labels;
         //We extract the descriptors for each image in the dataset using BoW extraction rather than using SIFT or any other feature extraction.
         for (int i = 0; i < dataset.size(); i++) {
             cv::Mat image = dataset[i];
             
-            //cout << "i " << i << endl;
+            cout << "i " << i << endl;
             vector<cv::KeyPoint> keypoints;
             cv::Mat descriptors;
             detector->detect(image, keypoints); //We compute keypoints that are used for training descriptors
             bowExtraction.compute(image, keypoints, descriptors); //Extract the descriptors of an image using BoW
             descriptors_to_train.push_back(descriptors);
             cv::Mat label = cv::Mat::ones(descriptors.rows, 1, CV_32SC1); //Ones label which tells that this image is a positive image that contains the object we want recognize
-            
-            labels.push_back(label);
+            if (!descriptors.empty())
+                labels.push_back(1);
         }
         descriptors_to_train.convertTo(descriptors_to_train, CV_32FC1);
         
@@ -162,13 +169,6 @@ public:
             cerr << "You can't predict an image without a trained vocabulary and a prediction model" << endl;
             return -1;
         }
-        cv::Ptr<cv::FeatureDetector> detector = cv::xfeatures2d::SiftFeatureDetector::create();
-        cv::Ptr<cv::DescriptorMatcher> matcher = cv::FlannBasedMatcher::create();
-        cv::Ptr<cv::DescriptorExtractor> extractor = cv::xfeatures2d::SiftDescriptorExtractor::create();
-        
-        cv::BOWImgDescriptorExtractor bowExtraction = cv::BOWImgDescriptorExtractor(extractor, matcher);
-        bowExtraction.setVocabulary(vocabulary);
-        
         cv::Mat descriptors;
         
         if (keypoints.size() == 0)
