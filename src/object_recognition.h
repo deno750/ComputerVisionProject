@@ -18,7 +18,6 @@ using namespace std;
 
 class ObjectRecognition {
 private:
-    uint vocabularySize;
     string vocabularypath;
     string svmModelpath;
     cv::Mat vocabulary;
@@ -31,12 +30,10 @@ private:
     
 public:
     /**
-     * -Param vocabularySize defines the size of the BoW vocabulary
      * -Param vocabularyFileName is the file name of the vocabulary if we want to store it locally
      * -Param svmModelFileName is the file name of the SVM model if we want to store it locally
      */
-    ObjectRecognition(uint vocabularySize, string vocabularyFileName = "", string svmModelFileName = "") {
-        this->vocabularySize = vocabularySize;
+    ObjectRecognition(string vocabularyFileName = "", string svmModelFileName = "") {
         this->vocabularypath = !vocabularyFileName.empty() ? "../models/vocabulary/" +vocabularyFileName+ ".yml" : "";
         this->svmModelpath = !svmModelFileName.empty() ? "../models/svm/" +svmModelFileName+ ".xml" : "";
         detector = cv::xfeatures2d::SiftFeatureDetector::create();
@@ -67,8 +64,10 @@ public:
     
     /**
      * Creates the BoW vocabulary using the passed dataset
+     * -Param dataset is the dataset for training the vocabulary
+     * -Param vocabularySize defines the size of the BoW vocabulary
      */
-    void createVocabulary(std::vector<cv::Mat> dataset) {
+    void createVocabulary(std::vector<cv::Mat> dataset, uint vocabularySize) {
         if (!vocabulary.empty()) {
             cout << "Vocabulary already trained" << endl;
             return;
@@ -90,7 +89,6 @@ public:
         }
          
         cv::TermCriteria criteria(cv::TermCriteria::MAX_ITER, 100, 0.001);
-        vector<int> labels;
         
         //Trains the vocabulary using kmeans clustering
         cv::BOWKMeansTrainer trainer = cv::BOWKMeansTrainer(vocabularySize);
@@ -137,9 +135,9 @@ public:
             detector->detect(image, keypoints); //We compute keypoints that are used for training descriptors
             bowExtraction.compute(image, keypoints, descriptors); //Extract the descriptors of an image using BoW
             descriptors_to_train.push_back(descriptors);
-            cv::Mat label = cv::Mat::ones(descriptors.rows, 1, CV_32SC1); //Ones label which tells that this image is a positive image that contains the object we want recognize
+             
             if (!descriptors.empty())
-                labels.push_back(1);
+                labels.push_back(1); //Ones label which tells that this image is a positive image that contains the object we want recognize
         }
         descriptors_to_train.convertTo(descriptors_to_train, CV_32FC1);
         

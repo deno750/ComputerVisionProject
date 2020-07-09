@@ -60,7 +60,7 @@ vector<Mat> cluster(Mat &input, Mat &output, int K, Mat1f &centers) {
     TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
     vector<int> labels;
     Mat image = input.clone();
-    
+    //GaussianBlur(input, image, Size(7, 7), 2);
     float posMul = 500; //This ensures that the maximal value of positions is 500
     vector<Vec6f> to_cluster;
     for (int i = 0; i < image.rows; i++) {
@@ -151,14 +151,14 @@ void drawRect(Mat image, Mat cluster, Scalar color = Scalar(0, 255, 0), uint rec
 
 #define SHOULD_TRAIN false //Since the user that uses this program shouldn't be aware of what is going under the hood, the training process can be activated only in code. So when the user uses the program, a vocabulary and svm model must be already trained. To create models for user's program, the developer will activate the train phase directly in code.
 
-//The input program should have as parameters image_path and number_of_clusters. If image_path is not passed, a default image will be used. When number_of_clusters is not passed, a default number of clusters is used (i.e. 5)
+//The input program should have as parameters image_path If image_path is not passed, a default image will be used.
 int main(int argc, char *argv[]) {
     
-    ObjectRecognition treeFeature = ObjectRecognition(200, "vocabulary", "model");
+    ObjectRecognition treeFeature = ObjectRecognition("vocabulary", "model");
     
 #if SHOULD_TRAIN
     vector<String> images_paths;
-    utils::fs::glob("../dataset", "tree*.*", images_paths);
+    utils::fs::glob("../dataset", "tree*.*", images_paths); //Dataset images should be named with "tree" as prefix (e.g. tree30.jpg)
     vector<Mat> images;
     for (String imPath : images_paths) {
         Mat mat = imread(imPath);
@@ -170,9 +170,9 @@ int main(int argc, char *argv[]) {
     }
     
     
-    int vocabularyImagesSize = 30;
+    int vocabularyImagesSize = 30; //30 images for vocabulary training
     if (vocabularyImagesSize > images.size()) {
-        cerr << "The number of images should be at least 30" << endl;
+        cerr << "The number of images should be at least " << vocabularyImagesSize << endl;
         return -1;
     }
     
@@ -182,19 +182,19 @@ int main(int argc, char *argv[]) {
         vocabularyImages.push_back(images[randomIndex]);
         
     }
-    treeFeature.createVocabulary(vocabularyImages);
+    treeFeature.createVocabulary(vocabularyImages, 200);
     treeFeature.train(images);
     cout << "Tree training ended" << endl;
 #endif
     
     string imagePath;
     if (argc == 1) {
-        imagePath = "../benchmark/Figure 5.jpg";
+        imagePath = "../benchmark/Figure 4.jpg"; //A default image if user doesn't pass any image in input
         
     } else {
         imagePath = string(argv[1]);
     }
-    
+
     //Parsing the path of the image to predict
     Mat image = imread(imagePath);
     if (image.empty()) {
@@ -202,24 +202,14 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     
-    //Parsing the number of clusters from input
-    uint numberOfClusters = 5;
-    if (argc == 3) {
-        int inputCluster = atoi(argv[2]);
-        if (inputCluster <= 0) {
-            cerr << "Number of clusters must be > 0" << endl;
-            return -1;
-        }
-        numberOfClusters = inputCluster;
-    }
-    
-    
-    
+
+    uint numberOfClusters = 6; //The number of clusters for image segmentation
+
     Mat clusterImage;
     Mat1f clusterCenters;
     vector<Mat> clusters = cluster(image, clusterImage, numberOfClusters, clusterCenters);
     imshow("Clustered image", clusterImage);
-    
+
     for (int i = 0; i < clusters.size(); i++) {
         Mat cluster = clusters[i];
         int res = treeFeature.predict(cluster);
@@ -227,15 +217,15 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         if (res == 1) {
-            medianBlur(cluster, cluster, 11); //Median blur is used to remove pixel noise
+            medianBlur(cluster, cluster, 23); //Median blur is used to remove noisy pixels
             drawRect(image, cluster);
             
-            //imshow("Cluster with tree " + to_string(i), cluster);
+            //imshow("Filtered cluster with tree " + to_string(i), cluster);
         }
     }
+
+    imshow("Tree detection ", image);
     
-    
-    imshow("Tree detection", image);
     
     waitKey(0);
     
