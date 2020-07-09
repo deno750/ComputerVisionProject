@@ -11,8 +11,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 add_executable(
     Project
     src/main.cpp
-    src/feature_extraction.h
-    src/image_prediction.h
+    src/object_recognition.h
 )
 
 target_link_libraries(Project ${OpenCV_LIBS})
